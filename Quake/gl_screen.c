@@ -1041,6 +1041,9 @@ int SCR_ModalMessage (const char *text, float timeout) //johnfitz -- timeout
 		 lastkey != K_ESCAPE &&
 		 lastkey != K_ABUTTON &&
 		 lastkey != K_BBUTTON &&
+ #ifdef __ANDROID__
+        lastkey != K_ENTER &&
+ #endif
 		 time2 <= time1);
 	Key_EndInputGrab ();
 
@@ -1051,7 +1054,11 @@ int SCR_ModalMessage (const char *text, float timeout) //johnfitz -- timeout
 		return false;
 	//johnfitz
 
+#ifdef __ANDROID__
+ 	return (lastchar == 'y' || lastchar == 'Y' || lastkey == K_ENTER || lastkey == K_ABUTTON);
+#else
 	return (lastchar == 'y' || lastchar == 'Y' || lastkey == K_ABUTTON);
+#endif
 }
 
 
@@ -1135,6 +1142,10 @@ void SCR_UpdateScreen (void)
 
 
 	GL_BeginRendering (&glx, &gly, &glwidth, &glheight);
+
+#ifdef __ANDROID__
+	GLSLGamma_BindFrameBuffer();
+#endif
 
 	if (cl.worldmodel && cl.qcvm.worldmodel && cl.qcvm.extfuncs.CSQC_UpdateView)
 	{

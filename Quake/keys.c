@@ -1259,7 +1259,9 @@ void Key_BeginInputGrab (void)
 	key_inputgrab.lastkey = -1;
 	key_inputgrab.lastchar = -1;
 
+#ifndef __ANDROID__ //Stop keyboard showing
 	IN_UpdateInputMode ();
+#endif
 }
 
 /*

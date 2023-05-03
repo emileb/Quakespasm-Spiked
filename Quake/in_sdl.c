@@ -303,7 +303,9 @@ static void IN_UpdateGrabs_Internal(qboolean forecerelease)
 	qboolean needevents;	//whether we want to receive events still
 
 	qboolean gamecodecursor = (key_dest == key_game && cl.qcvm.cursorforced) || (key_dest == key_menu && cls.menu_qcvm.cursorforced);
+
 	wantcursor = (key_dest == key_console || (key_dest == key_menu&&!bind_grab)) || gamecodecursor || !windowhasfocus;
+
 	freemouse = wantcursor && (modestate == MS_WINDOWED || gamecodecursor);
 	needevents = (!wantcursor) || key_dest == key_game;
 
@@ -898,10 +900,16 @@ void IN_MouseMove(usercmd_t *cmd)
 	}
 }
 
+#ifdef __ANDROID__
+void IN_Move_Android (usercmd_t *cmd);
+#endif
 void IN_Move(usercmd_t *cmd)
 {
 	IN_JoyMove(cmd);
 	IN_MouseMove(cmd);
+#ifdef __ANDROID__
+    IN_Move_Android (cmd);
+#endif
 }
 
 void IN_ClearStates (void)

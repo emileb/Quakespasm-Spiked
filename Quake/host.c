@@ -910,7 +910,10 @@ void _Host_Frame (double time)
 
 // allow mice or other external controllers to add commands
 	IN_Commands ();
-
+#ifdef __ANDROID__
+    void IN_Android_Commands();
+    IN_Android_Commands();
+#endif
 //check the stdin for commands (dedicated servers)
 	Host_GetConsoleCommands ();
 

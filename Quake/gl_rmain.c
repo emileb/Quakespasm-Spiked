@@ -120,7 +120,12 @@ cvar_t	r_scale = {"r_scale", "1", CVAR_ARCHIVE};
 // GLSL GAMMA CORRECTION
 //
 //==============================================================================
-
+#ifdef __ANDROID__
+static GLuint r_gamma_framebuffer;
+static GLuint r_gamma_depthbuffer;
+static int r_gamma_framebuffer_width, r_gamma_framebuffer_height;
+static GLuint r_gamma_framebuffer_texture;
+#endif
 static GLuint r_gamma_texture;
 static GLuint r_gamma_program;
 static int r_gamma_texture_width, r_gamma_texture_height;
@@ -181,6 +186,211 @@ static void GLSLGamma_CreateShaders (void)
 	textureLoc = GL_GetUniformLocation (&r_gamma_program, "GammaTexture");
 }
 
+#ifdef __ANDROID__
+void GLSLGamma_BindFrameBuffer (void)
+{
+	if (!gl_fbo_able)
+		return;
+
+	// Create texture
+	if (!r_gamma_framebuffer_texture)
+	{
+		glGenTextures (1, &r_gamma_framebuffer_texture);
+		glBindTexture (GL_TEXTURE_2D, r_gamma_framebuffer_texture);
+
+		r_gamma_framebuffer_width = glwidth;
+		r_gamma_framebuffer_height = glheight;
+
+		if (!gl_texture_NPOT)
+		{
+			r_gamma_framebuffer_width = TexMgr_Pad(r_gamma_framebuffer_width);
+			r_gamma_framebuffer_height = TexMgr_Pad(r_gamma_framebuffer_height);
+		}
+
+		glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, r_gamma_framebuffer_width, r_gamma_framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+
+	// Create depth buffer storage
+	if (!r_gamma_depthbuffer)
+	{
+		GL_GenRenderbuffers(1, &r_gamma_depthbuffer);
+	    GL_BindRenderbuffer(GL_RENDERBUFFER, r_gamma_depthbuffer);
+        GL_RenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, r_gamma_framebuffer_width, r_gamma_framebuffer_height);
+	}
+
+	// Create framebuffer
+	if (!r_gamma_framebuffer)
+	{
+ 	    GL_GenFrameBuffersFunc(1, &r_gamma_framebuffer);
+    }
+
+
+	if( !r_gamma_framebuffer_texture || !r_gamma_depthbuffer || !r_gamma_framebuffer)
+	{
+		Sys_Error("Error creating framebuffer or storage");
+	}
+
+	// Render to framebuffer
+    GL_BindFramebuffer(GL_FRAMEBUFFER, r_gamma_framebuffer);
+    GL_BindRenderbuffer(GL_RENDERBUFFER, r_gamma_depthbuffer);
+    GL_FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r_gamma_framebuffer_texture, 0);
+    GL_FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, r_gamma_depthbuffer);
+
+    GLenum result = GL_CheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (result != GL_FRAMEBUFFER_COMPLETE)
+	{
+	    Sys_Error("Error creating and attaching to framebuffer: %x", result);
+	}
+}
+#endif
+
+#ifdef __ANDROID__
+extern int mobile_screen_width;
+extern int mobile_screen_height;
+/*
+=============
+GLSLGamma_GammaCorrect
+=============
+*/
+void GLSLGamma_GammaCorrect (void)
+{
+
+	if( gl_fbo_able )
+	{
+		float smax, tmax;
+
+		// Note this always presume gl_glsl_gamma_able is true which it will be on Android
+
+		// create shader if needed
+		if (!r_gamma_program)
+		{
+		    GLSLGamma_CreateShaders ();
+		    if (!r_gamma_program)
+		    {
+		        Sys_Error("GLSLGamma_CreateShaders failed");
+		    }
+		}
+
+		// Unbind framebuffer
+		GL_BindFramebuffer(GL_FRAMEBUFFER, 0);
+	    GL_BindRenderbuffer(GL_RENDERBUFFER, 0);
+
+		// copy the framebuffer to the texture
+		GL_DisableMultitexture();
+		glBindTexture (GL_TEXTURE_2D, r_gamma_framebuffer_texture);
+
+		// draw the texture back to the framebuffer with a fragment shader
+		GL_UseProgramFunc (r_gamma_program);
+		GL_Uniform1fFunc (gammaLoc, vid_gamma.value);
+		GL_Uniform1fFunc (contrastLoc, q_min(2.0, q_max(1.0, vid_contrast.value)));
+		GL_Uniform1iFunc (textureLoc, 0); // use texture unit 0
+
+		glDisable (GL_ALPHA_TEST);
+		glDisable (GL_DEPTH_TEST);
+
+		glViewport (glx, gly, mobile_screen_width, mobile_screen_height);
+
+		smax = glwidth/(float)r_gamma_framebuffer_width;
+		tmax = glheight/(float)r_gamma_framebuffer_height;
+
+		glBegin (GL_QUADS);
+		glTexCoord2f (0, 0);
+		glVertex2f (-1, -1);
+		glTexCoord2f (smax, 0);
+		glVertex2f (1, -1);
+		glTexCoord2f (smax, tmax);
+		glVertex2f (1, 1);
+		glTexCoord2f (0, tmax);
+		glVertex2f (-1, 1);
+		glEnd ();
+		glBindTexture  (GL_TEXTURE_2D,0);
+
+		GL_UseProgramFunc (0);
+
+		// clear cached binding
+		GL_ClearBindings ();
+	}
+	else
+	{
+
+		float smax, tmax;
+
+		if (!gl_glsl_gamma_able)
+			return;
+
+		if (vid_gamma.value == 1 && vid_contrast.value == 1)
+			return;
+
+	// create render-to-texture texture if needed
+    	if (!r_gamma_texture)
+    	{
+    		glGenTextures (1, &r_gamma_texture);
+    		glBindTexture (GL_TEXTURE_2D, r_gamma_texture);
+
+    		r_gamma_texture_width = glwidth;
+    		r_gamma_texture_height = glheight;
+
+    		if (!gl_texture_NPOT)
+    		{
+    			r_gamma_texture_width = TexMgr_Pad(r_gamma_texture_width);
+    			r_gamma_texture_height = TexMgr_Pad(r_gamma_texture_height);
+    		}
+
+    		glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, r_gamma_texture_width, r_gamma_texture_height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+    		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    	}
+
+	// create shader if needed
+		if (!r_gamma_program)
+		{
+			GLSLGamma_CreateShaders ();
+			if (!r_gamma_program)
+			{
+				Sys_Error("GLSLGamma_CreateShaders failed");
+			}
+		}
+
+	// copy the framebuffer to the texture
+		GL_DisableMultitexture();
+		glBindTexture (GL_TEXTURE_2D, r_gamma_texture);
+		glCopyTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, glx, gly, glwidth, glheight);
+
+	// draw the texture back to the framebuffer with a fragment shader
+		GL_UseProgramFunc (r_gamma_program);
+		GL_Uniform1fFunc (gammaLoc, vid_gamma.value);
+		GL_Uniform1fFunc (contrastLoc, q_min(2.0, q_max(1.0, vid_contrast.value)));
+		GL_Uniform1iFunc (textureLoc, 0); // use texture unit 0
+
+		glDisable (GL_ALPHA_TEST);
+		glDisable (GL_DEPTH_TEST);
+
+		glViewport (glx, gly, mobile_screen_width, mobile_screen_height);
+
+		smax = glwidth/(float)r_gamma_texture_width;
+		tmax = glheight/(float)r_gamma_texture_height;
+
+		glBegin (GL_QUADS);
+		glTexCoord2f (0, 0);
+		glVertex2f (-1, -1);
+		glTexCoord2f (smax, 0);
+		glVertex2f (1, -1);
+		glTexCoord2f (smax, tmax);
+		glVertex2f (1, 1);
+		glTexCoord2f (0, tmax);
+		glVertex2f (-1, 1);
+		glEnd ();
+
+		GL_UseProgramFunc (0);
+
+	// clear cached binding
+		GL_ClearBindings ();
+	}
+}
+
+#else
 /*
 =============
 GLSLGamma_GammaCorrect
@@ -264,7 +474,7 @@ void GLSLGamma_GammaCorrect (void)
 // clear cached binding
 	GL_ClearBindings ();
 }
-
+#endif
 /*
 =================
 R_CullBox -- johnfitz -- replaced with new function from lordhavoc

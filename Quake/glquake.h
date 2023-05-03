@@ -216,8 +216,27 @@ extern PFNGLMAPBUFFERARBPROC	GL_MapBufferFunc;
 extern PFNGLUNMAPBUFFERARBPROC	GL_UnmapBufferFunc;
 extern	qboolean	gl_vbo_able;
 //ericw
+#ifdef __ANDROID__
+typedef void (APIENTRYP PFNGLBUFFERSTORAGEPROC) (GLenum target, GLsizeiptr size, const void *data, GLbitfield flags);
+#define GL_MAP_PERSISTENT_BIT             0x0040
+#define GL_MAP_COHERENT_BIT               0x0080
+#define GL_CLIENT_STORAGE_BIT             0x0200
+#endif
 extern PFNGLMAPBUFFERRANGEPROC	GL_MapBufferRangeFunc;
 extern PFNGLBUFFERSTORAGEPROC	GL_BufferStorageFunc;
+
+#ifdef __ANDROID__
+//emile -- FBO
+extern PFNGLGENFRAMEBUFFERSPROC GL_GenFrameBuffersFunc;
+extern PFNGLBINDFRAMEBUFFERPROC GL_BindFramebuffer;
+extern PFNGLFRAMEBUFFERTEXTURE2DPROC GL_FramebufferTexture2D;
+extern PFNGLFRAMEBUFFERRENDERBUFFERPROC GL_FramebufferRenderbuffer;
+extern PFNGLCHECKFRAMEBUFFERSTATUSPROC GL_CheckFramebufferStatus;
+extern PFNGLGENRENDERBUFFERSPROC GL_GenRenderbuffers;
+extern PFNGLBINDRENDERBUFFERPROC GL_BindRenderbuffer;
+extern PFNGLRENDERBUFFERSTORAGEPROC GL_RenderbufferStorage;
+extern	qboolean	gl_fbo_able;
+#endif
 
 //ericw -- GLSL
 
@@ -477,7 +496,9 @@ void GL_ClearBufferBindings ();
 
 void GLSLGamma_DeleteTexture (void);
 void GLSLGamma_GammaCorrect (void);
-
+#ifdef __ANDROID__
+void GLSLGamma_BindFrameBuffer (void);
+#endif
 void R_ScaleView_DeleteTexture (void);
 
 float GL_WaterAlphaForSurface (msurface_t *fa);

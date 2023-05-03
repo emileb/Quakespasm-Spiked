@@ -553,7 +553,9 @@ void GL_BindBuffer (GLenum target, GLuint buffer)
 			return;
 	}
 
+#ifndef __ANDROID__
 	if (*cache != buffer)
+#endif
 	{
 		*cache = buffer;
 		GL_BindBufferFunc (target, *cache);
