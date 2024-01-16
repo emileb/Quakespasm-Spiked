@@ -121,7 +121,7 @@ LOCAL_SRC_FILES :=  $(OBJS:.o=.c) \
 
 LOCAL_LDLIBS := -lEGL -ldl -llog -lz
 LOCAL_STATIC_LIBRARIES := sigc libzip libpng logwritter  mpg123 ifaddrs mad
-LOCAL_SHARED_LIBRARIES := touchcontrols SDL2 SDL2_mixer core_shared GL4ES saffal
+LOCAL_SHARED_LIBRARIES := touchcontrols libvorbis libogg SDL2 SDL2_mixer core_shared GL4ES saffal
 
 include $(BUILD_SHARED_LIBRARY)
 
