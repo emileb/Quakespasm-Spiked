@@ -258,7 +258,7 @@ static char	userdir[MAX_OSPATH];
 #define SYS_USERDIR	"Library/Application Support/QuakeSpasm"
 #else
 #ifdef __ANDROID__
-#define SYS_USERDIR	"../user_files/quakespasm-spiked"
+#define SYS_USERDIR	"quakespasm-spiked"
 #else
 #define SYS_USERDIR	".quakespasm"
 #endif
@@ -270,7 +270,9 @@ static void Sys_GetUserdir (char *dst, size_t dstsize)
 	const char	*home_dir = NULL;
 	struct passwd	*pwent;
 #ifdef __ANDROID__
-	home_dir = getenv("HOME");
+	home_dir = getenv("USER_FILES");
+	q_snprintf (dst, dstsize, "%s/%s", home_dir, SYS_USERDIR);
+	return;
 #else
 	pwent = getpwuid( getuid() );
 	if (pwent == NULL)
