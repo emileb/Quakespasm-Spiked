@@ -295,15 +295,43 @@ void GLSLGamma_GammaCorrect (void)
 		smax = glwidth/(float)r_gamma_framebuffer_width;
 		tmax = glheight/(float)r_gamma_framebuffer_height;
 
+        float left = -1;
+        float right = 1;
+        float top = 1;
+        float bottom = -1;
+
+        float realRatio = (float) mobile_screen_width/ (float)mobile_screen_height;
+        float fbRatio = (float) glwidth / (float)glheight;
+
+        if(COM_CheckParm("-maintain_aspect") && fabs(realRatio - fbRatio) > 0.01)
+        {
+            float xScale = fbRatio / realRatio;
+            float yScale = realRatio / fbRatio;
+
+            if(xScale < 1)
+            {
+                left = -xScale;
+                right = xScale;
+            }
+            else
+            {
+                top = yScale;
+                bottom = -yScale;
+            }
+
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
 		glBegin (GL_QUADS);
 		glTexCoord2f (0, 0);
-		glVertex2f (-1, -1);
+		glVertex2f (left, bottom);
 		glTexCoord2f (smax, 0);
-		glVertex2f (1, -1);
+		glVertex2f (right, bottom);
 		glTexCoord2f (smax, tmax);
-		glVertex2f (1, 1);
+		glVertex2f (right, top);
 		glTexCoord2f (0, tmax);
-		glVertex2f (-1, 1);
+		glVertex2f (left, top);
 		glEnd ();
 		glBindTexture  (GL_TEXTURE_2D,0);
 
